@@ -15,7 +15,7 @@ contract PrivateAccessToken is ERC1155{
         require(OnlyIf(msg.sender)==true);
         _;
     }
-    //The OnlyIf Function will run in the modifier to check is user accessing the contract is the token holder
+    //The OnlyIf Function will run in the modifier to check if the user accessing the contract is the token holder
     function OnlyIf(address _user)internal view returns(bool){
         if(balanceOf(_user,0)==1){
             return true;
@@ -32,5 +32,4 @@ contract PrivateAccessToken is ERC1155{
         return balanceOf(msg.sender,0);
     }
 }
-
 //- Auth: Quincy J
