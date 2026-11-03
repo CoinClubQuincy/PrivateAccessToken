@@ -20,12 +20,14 @@ This demo shows how a token can control access to private data without putting t
 
 ```mermaid
 flowchart LR
-    H[Token holder] -->|asks for the key| S[Your off-chain service]
+    H[Token holder] -->|asks for the key, signs a fresh challenge| S[Your off-chain service]
     S -->|balanceOf: holds the token?| C[PrivateAccessToken]
     S -->|decryption key| H
     H -->|fetches| E[Encrypted copy off-chain]
     H -->|verifyData: right document?| C
 ```
+
+Your service must check a signature over a fresh random challenge before it reads `balanceOf`. `balanceOf` only shows what an address holds, and anyone can claim to be that address.
 
 ![Private access token](https://user-images.githubusercontent.com/16103963/152224651-a5dfd46c-1982-45b2-8e41-1ee3b6ff1eb4.png)
 
