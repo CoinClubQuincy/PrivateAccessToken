@@ -11,31 +11,34 @@
   <a href="#how-it-works">How it works</a> · <a href="#try-it">Try it</a> · <a href="#what-is-tested">What is tested</a> · <a href="#known-issues">Known issues</a>
 </p>
 
-This demo stores a value in a contract and only lets the holder of an access token call the function that returns it. Sell or transfer the token, and the ability to call that function moves with it.
+This demo shows how a token can control access to private data without putting that data on-chain. The contract stores only a hash of the data and a link to an encrypted copy kept elsewhere. Sell or transfer the token, and the right to access moves with it.
 
 > [!CAUTION]
-> **This does not keep data private. Never store real personal data this way.** `private` in Solidity only stops other contracts from reading a variable. Anyone can read the value from chain state or from the deployment transaction, and a test in this repo does exactly that. The earlier description here suggested otherwise, and that was wrong.
+> **Gating a function does not hide anything.** `private` in Solidity only stops other contracts from reading a variable, and anyone can read the hash and the link from chain state. A test in this repo does that. Privacy depends on the encryption and on your off-chain service, which must check the token before handing over the decryption key. This contract has not been audited.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    H[Token holder] -->|ViewData| C[PrivateAccessToken]
-    C -->|returns the value| H
-    O[Anyone else] -->|ViewData| C
-    C -.->|reverts| O
-    O -->|reads storage directly| S[Slot 3 holds the value]
+    H[Token holder] -->|asks for the key| S[Your off-chain service]
+    S -->|balanceOf: holds the token?| C[PrivateAccessToken]
+    S -->|decryption key| H
+    H -->|fetches| E[Encrypted copy off-chain]
+    H -->|verifyData: right document?| C
 ```
 
 ![Private access token](https://user-images.githubusercontent.com/16103963/152224651-a5dfd46c-1982-45b2-8e41-1ee3b6ff1eb4.png)
 
 | Function | What it does |
 | --- | --- |
-| `constructor(data, uri)` | Stores the value and mints the access token to the deployer |
-| `ViewData()` | Returns the value to the token holder |
+| `constructor(dataHash, encryptedDataURI, uri)` | Stores the hash and link, and mints the access token to the deployer |
+| `ViewData()` | Returns the hash and link to the token holder |
+| `verifyData(hash)` | Tells anyone whether a hash matches the stored one |
 | `ViewStatus()` | Returns the caller's token balance |
 
-**What it's good for:** learning how a token can gate a function. To protect real data, keep it off-chain, encrypted, and have the token control access to the decryption key or service.
+Add a random salt to what you hash. A hash of predictable data can be guessed.
+
+The off-chain service and the encryption are not part of this repo. You need to build them.
 
 ## Try it
 
@@ -47,17 +50,27 @@ git clone --depth 1 -b v1.9.7 https://github.com/foundry-rs/forge-std lib/forge-
 forge test
 ```
 
-You need [Foundry](https://getfoundry.sh). Tests named `test_KnownIssue_*` pass because they pin a defect, so a passing run does not mean the defect is gone.
+You need [Foundry](https://getfoundry.sh).
 
 ## What is tested
 
-[`test/foundry/PrivateAccessToken.t.sol`](test/foundry/PrivateAccessToken.t.sol) has 4 tests and runs in CI on every push. They show holders can call `ViewData`, others are refused, access moves with the token, and the value can be read from storage without the token. It has not been run on a real network or audited, and the older Truffle test was not run.
+[`test/foundry/PrivateAccessToken.t.sol`](test/foundry/PrivateAccessToken.t.sol) has 7 tests and runs in CI on every push. They show holders can call `ViewData`, others are refused, access moves with the token, anyone can verify a hash, and the stored hash can be read from storage without the token. It has not been run on a real network or audited.
+
+## Changes from earlier versions
+
+Contracts already deployed are unaffected. **Anything an earlier deployment stored can still be read from the chain, and it cannot be removed.**
+
+- The constructor takes a data hash and an encrypted data link instead of the data itself.
+- `ViewData` returns those two values.
+- `verifyData` is new.
+- The older Truffle test was removed. Foundry is the supported test path.
 
 ## Known issues
 
 | Issue | Effect | Test |
 | --- | --- | --- |
-| The stored value is public | Anyone can read it without the token | `test_DataIsReadableFromStorageWithoutTheToken` |
+| The hash and link are public | Anyone can read them without the token, so the link must only ever point to encrypted data | `test_TheStoredHashIsReadableWithoutTheToken` |
+| Selling the token does not revoke a key | A past holder who already has the decryption key can still read the data. Encrypt again with a new key if that matters | Read from the code |
 
 <details>
 <summary><strong>More XDC projects</strong></summary>
